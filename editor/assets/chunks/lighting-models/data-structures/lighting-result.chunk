@@ -1,0 +1,33 @@
+struct LightingResult
+{
+  // material-dependent lighting data
+  vec3 diffuseColorWithLighting, specularColorWithLighting, specularColorWithEnvLighting;
+
+  // pure lighting
+  vec3 directDiffuse, directSpecular;
+  vec3 environmentDiffuse, environmentSpecular;
+  float shadow, ao;
+  vec3 lightmapColor;
+  vec3 emissive;
+
+  // advanced
+#if CC_SURFACES_LIGHTING_USE_FRESNEL
+  float fresnel;
+#endif
+
+#if CC_SURFACES_LIGHTING_TRANSMIT_SPECULAR
+  vec3 directTransmitSpecular, environmentTransmitSpecular;
+#endif
+#if CC_SURFACES_LIGHTING_TRANSMIT_DIFFUSE
+  vec3 directTransmitDiffuse, environmentTransmitDiffuse;
+#endif  
+#if CC_SURFACES_LIGHTING_2ND_LAYER_SPECULAR
+  vec3 direct2ndSpecular, environment2ndSpecular;
+  vec3 specularColorWithLighting2ndSpecular, specularColorWithEnvLighting2ndSpecular;
+#endif
+#if CC_SURFACES_LIGHTING_TT
+  vec3 directTT;
+  vec3 diffuseColorWithLightingTT;
+#endif
+  //vec3 scattered;
+};
