@@ -54,13 +54,19 @@ export class gccBGMChannel extends gccSoundChannel {
     private fadeOutCurrent(): void {
         if (!this.currentBgmKey) return;
         const instance = this.getActiveInstanceByKey(this.currentBgmKey);
-        if (instance) {
-            this.activeInstances.delete(instance.id);
-            this.adapter.fadeOutVolume(instance, 0, this.config.fadeDuration);
-            setTimeout(() => {
-                this.adapter.stop(instance);
-            }, this.config.fadeDuration * 1000);
+        if (!instance) {
+            return;
         }
+        this.activeInstances.delete(instance.id);
+        this.adapter.fadeOutVolume(instance, 0, this.config.fadeDuration);
+        const pool = this.ensurePool(instance.asset.key);
+        setTimeout(() => {
+            this.adapter.bindOnEnd(instance);
+            this.adapter.stop(instance);
+            if (pool.length < this.config.maxPoolSize) {
+                pool.push(instance);
+            }
+        }, this.config.fadeDuration * 1000);
     }
 }
 

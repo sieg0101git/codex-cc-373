@@ -120,8 +120,7 @@ export class gccSoundAdapter {
             .start();
     }
 
-    public createInstance(key: string, _options?: any): gccSoundInstance | null {
-        const { onEnd } = _options || {};
+    public createInstance(key: string): gccSoundInstance | null {
         const asset = this.getAssetLoadedByKey(key);
         if (!asset) {
             console.warn(`Asset with key "${key}" is not loaded.`);
@@ -135,9 +134,6 @@ export class gccSoundAdapter {
         node.parent = this.gameNode;
         node.active = true;
         node.setPosition(Vec3.ZERO);
-        if (onEnd) {
-            node.on(AudioSource.EventType.ENDED, onEnd);
-        }
         return {
             id,
             player: audioSource,
@@ -148,6 +144,18 @@ export class gccSoundAdapter {
             volume: 1,
             muted: false,
         };
+    }
+
+    public bindOnEnd(instance: gccSoundInstance, handler?: () => void): void {
+        const audioSource = instance.player as AudioSource;
+        if (instance.onEndHandler) {
+            audioSource.off(AudioSource.EventType.ENDED, instance.onEndHandler);
+            instance.onEndHandler = undefined;
+        }
+        if (handler) {
+            instance.onEndHandler = handler;
+            audioSource.on(AudioSource.EventType.ENDED, handler);
+        }
     }
 
     public resetInstance(instance:gccSoundInstance): void {

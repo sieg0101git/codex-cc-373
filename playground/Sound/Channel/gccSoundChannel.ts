@@ -45,6 +45,7 @@ export abstract class gccSoundChannel {
             const { length } = pool;
             for (let index = 0; index < length; index += 1) {
                 const inst = pool[index];
+                this.adapter.bindOnEnd(inst);
                 this.adapter.stop(inst);
             }
         }
@@ -61,67 +62,13 @@ export abstract class gccSoundChannel {
     }
 
     async play(key: string, options?: any): Promise<string | null> {
-        if (!this.instancePool.has(key)) {
-            return null;
-        }
-        if (this.activeInstances.size >= this.config.maxInstances) {
-            const oldestKey = this.activeInstances.keys().next().value;
-            this.stop(oldestKey);
-        }
-        if (this.adapter.isWebSound === true && this.adapter.getStateAudioContext() === 'suspended') {
-            await this.adapter.ensureAudioUnlocked();
-        }
-        const pool = this.ensurePool(key);
-        let instance = pool.pop();
-        if (!instance) {
-            instance = this.adapter.createInstance(key, {
-                onEnd: () => {
-                    this.stop(instance.id);
-                    if (options && typeof options.onEnd === "function") {
-                        options.onEnd();
-                    }
-                }
-            });
-            if (!instance) {
-                return null;
-            }
-        }
-        const loop = options && options.loop ? options.loop : false;
-        const volume = this.channelEnabled ? (options?.volume ?? this.channelVolume): 0;
-        this.adapter.play(instance, { offset: instance.elapsed || 0 });
-        this.adapter.setInstanceLoop(instance, loop);
-        this.adapter.setInstanceVolume(instance, volume);
-        this.activeInstances.set(instance.id, instance);
-        return instance.id;
+        const instance = await this.startPlayback(key, options);
+        return instance ? instance.id : null;
     }
+
     async playOneShot(key: string, options?: any): Promise<string | null> {
-        if (this.activeInstances.size >= this.config.maxInstances) {
-            const oldestKey = this.activeInstances.keys().next().value;
-            this.stop(oldestKey);
-        }
-        await this.adapter.ensureAudioUnlocked();
-        const pool = this.ensurePool(key);
-        let instance = pool.pop();
-        if (!instance) {
-            instance = this.adapter.createInstance(key, {
-                onEnd: () => {
-                    this.stop(instance.id);
-                    if (options && typeof options.onEnd === "function") {
-                        options.onEnd();
-                    }
-                }
-            });
-            if (!instance) {
-                return null;
-            }
-        }
-        const loop = options && options.loop ? options.loop : false;
-        const volume = this.channelEnabled ? (options?.volume ?? this.channelVolume): 0;
-        this.adapter.play(instance, { offset: instance.elapsed || 0 });
-        this.adapter.setInstanceLoop(instance, loop);
-        this.adapter.setInstanceVolume(instance, volume);
-        this.activeInstances.set(instance.id, instance);
-        return instance.id;
+        const instance = await this.startPlayback(key, options);
+        return instance ? instance.id : null;
     }
 
 
@@ -129,18 +76,22 @@ export abstract class gccSoundChannel {
         const instance = this.activeInstances.get(id);
         if (instance) {
             this.adapter.pause(instance);
-            const pool = this.ensurePool(instance.asset.key);
-            if (pool.length < this.config.maxPoolSize) {
-                pool.push(instance);
-                return;
-            }
-            this.adapter.stop(instance);
         }
     }
 
     resume(id: string): void {
         const instance = this.activeInstances.get(id);
         if (instance) {
+            const pool = this.instancePool.get(instance.asset.key);
+            if (pool) {
+                const poolLength = pool.length;
+                for (let index = 0; index < poolLength; index += 1) {
+                    if (pool[index] === instance) {
+                        pool.splice(index, 1);
+                        break;
+                    }
+                }
+            }
             this.adapter.resume(instance);
         }
     }
@@ -148,6 +99,7 @@ export abstract class gccSoundChannel {
     stop(id: string): void {
         const instance = this.activeInstances.get(id);
         if (instance) {
+            this.adapter.bindOnEnd(instance);
             this.adapter.stop(instance);
             this.activeInstances.delete(id);
             const pool = this.ensurePool(instance.asset.key);
@@ -243,6 +195,43 @@ export abstract class gccSoundChannel {
             this.instancePool.set(key, pool);
         }
         return pool;
+    }
+
+    private async startPlayback(key: string, options?: any): Promise<gccSoundInstance | null> {
+        if (this.activeInstances.size >= this.config.maxInstances) {
+            const iterator = this.activeInstances.keys();
+            const oldest = iterator.next();
+            if (!oldest.done) {
+                this.stop(oldest.value);
+            }
+        }
+        if (this.adapter.isWebSound === true && this.adapter.getStateAudioContext() === 'suspended') {
+            await this.adapter.ensureAudioUnlocked();
+        }
+        const pool = this.ensurePool(key);
+        let instance = pool.pop();
+        if (!instance) {
+            instance = this.adapter.createInstance(key);
+            if (!instance) {
+                return null;
+            }
+        }
+        instance.elapsed = 0;
+        const loop = options && typeof options.loop === "boolean" ? options.loop : this.config.defaultLoop;
+        const volume = this.channelEnabled ? (options && typeof options.volume === "number" ? options.volume : this.channelVolume) : 0;
+        this.adapter.setInstanceLoop(instance, loop);
+        this.adapter.setInstanceVolume(instance, volume);
+        instance.loop = loop;
+        const onEndHandler = () => {
+            this.stop(instance.id);
+            if (options && typeof options.onEnd === "function") {
+                options.onEnd();
+            }
+        };
+        this.adapter.bindOnEnd(instance, onEndHandler);
+        this.activeInstances.set(instance.id, instance);
+        this.adapter.play(instance, { offset: instance.elapsed || 0 });
+        return instance;
     }
 }
 

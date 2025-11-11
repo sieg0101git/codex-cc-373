@@ -11,7 +11,6 @@ export class gccSFXChannel extends gccSoundChannel {
     }
 
     pauseAll(): void {
-        super.pauseAll();
-        this.activeInstances.clear();
+        this.stopAll();
     }
 }

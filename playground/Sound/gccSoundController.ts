@@ -8,6 +8,7 @@ const { ccclass, property } = _decorator;
 export class gccSoundController extends gccSoundBase {
     protected currSoundBigWin: string | null = null;
     protected readonly listKeyBigWin: BigWinKey[] = ["sfxBig_win", "sfxSuper_win", "sfxMega_win"];
+    private previousVolumeBeforeBigWin: { bgm: number; sfx: number } | null = null;
     @property isDebug: boolean = false;
 
     protected static _instance: gccSoundController = null;
@@ -30,10 +31,12 @@ export class gccSoundController extends gccSoundBase {
     public stopSfxBigWin(): void {
         const { currSoundBigWin } = this;
         if (!currSoundBigWin) {
+            this.restoreVolumeAfterBigWin();
             return;
         }
         this.getSFXChannel().stop(currSoundBigWin);
         this.currSoundBigWin = null;
+        this.restoreVolumeAfterBigWin();
     }
 
     public playBgmRoom(): void {
@@ -86,33 +89,71 @@ export class gccSoundController extends gccSoundBase {
     }
 
     private async playBigWinSfx(key: BigWinKey): Promise<void> {
-        this.applyBigWinVolume();
+        this.prepareBigWinVolumes();
         this.stopOtherBigWinInstances();
+        let trackedInstanceId: string | null = null;
         const instanceId = await this.playSFX(key, {
             onEnd: () => {
-                this.currSoundBigWin = null;
-                this.setVolumeAll(1.0);
+                if (trackedInstanceId && this.currSoundBigWin === trackedInstanceId) {
+                    this.currSoundBigWin = null;
+                    this.restoreVolumeAfterBigWin();
+                }
             }
         });
-        this.currSoundBigWin = instanceId ?? null;
+        trackedInstanceId = instanceId ?? null;
+        if (!instanceId) {
+            this.restoreVolumeAfterBigWin();
+            return;
+        }
+        this.currSoundBigWin = instanceId;
     }
 
-    private applyBigWinVolume(): void {
+    private prepareBigWinVolumes(): void {
+        if (!this.previousVolumeBeforeBigWin) {
+            this.previousVolumeBeforeBigWin = {
+                bgm: this.getBGMChannel().getChannelVolume(),
+                sfx: this.getSFXChannel().getChannelVolume(),
+            };
+        }
         this.setVolumeBGM(0.4);
         this.setVolumeSFX(0.6);
     }
 
     private stopOtherBigWinInstances(): void {
-        const { listKeyBigWin } = this;
-        const { length } = listKeyBigWin;
-        for (let index = 0; index < length; index += 1) {
-            const key = listKeyBigWin[index];
-            const activeIds = this.sfxChannel.getActivesIdByKey(key);
-            const total = activeIds.length;
-            for (let idIndex = 0; idIndex < total; idIndex += 1) {
-                this.sfxChannel.stop(activeIds[idIndex]);
+        const idsToStop: string[] = [];
+        this.sfxChannel.activeInstances.forEach((instance, id) => {
+            if (this.isBigWinKey(instance.asset.key)) {
+                idsToStop.push(id);
+            }
+        });
+        const total = idsToStop.length;
+        for (let index = 0; index < total; index += 1) {
+            const instanceId = idsToStop[index];
+            this.sfxChannel.stop(instanceId);
+            if (this.currSoundBigWin === instanceId) {
+                this.currSoundBigWin = null;
             }
         }
+    }
+
+    private restoreVolumeAfterBigWin(): void {
+        if (!this.previousVolumeBeforeBigWin) {
+            return;
+        }
+        this.setVolumeBGM(this.previousVolumeBeforeBigWin.bgm);
+        this.setVolumeSFX(this.previousVolumeBeforeBigWin.sfx);
+        this.previousVolumeBeforeBigWin = null;
+    }
+
+    private isBigWinKey(key: string): key is BigWinKey {
+        const { listKeyBigWin } = this;
+        const total = listKeyBigWin.length;
+        for (let index = 0; index < total; index += 1) {
+            if (listKeyBigWin[index] === key) {
+                return true;
+            }
+        }
+        return false;
     }
 }
 
