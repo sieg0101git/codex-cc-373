@@ -11,16 +11,19 @@ export class gccBGMChannel extends gccSoundChannel {
         };
     }
 
-    async play(key: string, options: any = {loop: true, volume: 1.}): Promise<string> {
-        let instanceId = null;
+    async play(key: string, options: any = { loop: true, volume: 1. }): Promise<string | null> {
+        let instanceId: string | null = null;
         if (this.currentBgmKey) {
-            if(this.currentBgmKey !== key) {
+            if (this.currentBgmKey !== key) {
                 this.fadeOutCurrent();
                 instanceId = await super.play(key, options);
                 this.currentBgmKey = key;
             } else {
-                instanceId = this.getActiveInstanceByKey(key).id;
-                this.resume(instanceId);
+                const activeInstance = this.getActiveInstanceByKey(key);
+                if (activeInstance) {
+                    instanceId = activeInstance.id;
+                    this.resume(instanceId);
+                }
                 return instanceId;
             }
         } else {
@@ -33,7 +36,7 @@ export class gccBGMChannel extends gccSoundChannel {
     resume(id: string): void {
         super.resume(id);
         const instance = this.activeInstances.get(id);
-        if(instance) {
+        if (instance) {
             this.currentBgmKey = instance.asset.key;
         }
     }
@@ -51,8 +54,8 @@ export class gccBGMChannel extends gccSoundChannel {
     private fadeOutCurrent(): void {
         if (!this.currentBgmKey) return;
         const instance = this.getActiveInstanceByKey(this.currentBgmKey);
-        this.activeInstances.delete(this.currentBgmKey);
         if (instance) {
+            this.activeInstances.delete(instance.id);
             this.adapter.fadeOutVolume(instance, 0, this.config.fadeDuration);
             setTimeout(() => {
                 this.adapter.stop(instance);

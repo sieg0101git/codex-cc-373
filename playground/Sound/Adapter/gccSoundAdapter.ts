@@ -7,43 +7,64 @@ export class gccSoundAdapter {
     protected mapLoadedAssets: Map<string, ISoundAsset> = new Map();
     private nextId: number = 0;
     protected gameNode: Node;
-    public audioContext: AudioContext;
+    public audioContext: AudioContext | null = null;
     public isWebSound = false;
     constructor(gameNode?: Node) {
-        this.isWebSound = (sys.isBrowser == true);
+        this.isWebSound = sys.isBrowser === true;
         if (this.isWebSound) {
-            this.audioContext = new (globalThis.AudioContext || globalThis.webkitAudioContext)();
+            const audioContextCtor = globalThis.AudioContext || (globalThis as any).webkitAudioContext;
+            if (audioContextCtor) {
+                this.audioContext = new audioContextCtor();
+            }
         }
         this.gameNode = gameNode;
     }
 
     public getStateAudioContext(): string {
-        return this.audioContext.state;
+        return this.audioContext ? this.audioContext.state : "running";
     }
 
     async ensureAudioUnlocked(): Promise<void> {
-        if (!this.isWebSound || this.audioContext.state !== 'suspended') return;
+        if (!this.isWebSound || !this.audioContext || this.audioContext.state !== 'suspended') {
+            return;
+        }
         return new Promise((resolve, reject) => {
-            const handler = async () => {
+            const resumeContext = async () => {
                 try {
-                    await this.audioContext.resume();
+                    if (this.audioContext) {
+                        await this.audioContext.resume();
+                    }
                     resolve();
                 } catch (error) {
                     reject(error);
                 } finally {
-                    if (this.gameNode) this.gameNode.off(Node.EventType.TOUCH_START, handler, this);
+                    if (this.gameNode) {
+                        this.gameNode.off(Node.EventType.TOUCH_START, resumeContext, this);
+                    }
                 }
             };
-            if (this.gameNode) this.gameNode.on(Node.EventType.TOUCH_START, handler, this);
+            if (this.gameNode) {
+                this.gameNode.on(Node.EventType.TOUCH_START, resumeContext, this);
+                return;
+            }
+            void resumeContext();
         });
     }
 
     public loadAsset(asset: ISoundAsset, _options?: any): Promise<void> {
-        if (this.mapLoadedAssets.has(asset.key)) return Promise.resolve();
+        if (this.mapLoadedAssets.has(asset.key)) {
+            return Promise.resolve();
+        }
+        this.mapLoadedAssets.set(asset.key, asset);
+        return Promise.resolve();
     }
 
     public unloadAsset(asset: ISoundAsset, _options?: any): Promise<void> {
-        if (!this.mapLoadedAssets.has(asset.key)) return Promise.resolve();
+        if (!this.mapLoadedAssets.has(asset.key)) {
+            return Promise.resolve();
+        }
+        this.mapLoadedAssets.delete(asset.key);
+        return Promise.resolve();
     }
 
     public initAsset(asset: ISoundAsset) : void {
@@ -99,27 +120,27 @@ export class gccSoundAdapter {
             .start();
     }
 
-    public createInstance(key: string, _options?: any): gccSoundInstance {
-        const { onEnd } = _options;
+    public createInstance(key: string, _options?: any): gccSoundInstance | null {
+        const { onEnd } = _options || {};
         const asset = this.getAssetLoadedByKey(key);
-        if(!asset) {
-            console.warn("asset " + asset.key + "is not loaded" )
-            return;
+        if (!asset) {
+            console.warn(`Asset with key "${key}" is not loaded.`);
+            return null;
         }
-        const id = `inst_${this.nextId++}`; //
+        const id = `inst_${this.nextId++}`;
         const node = new Node("SoundAudio");
-        let audioSource: AudioSource;
-        audioSource = node.addComponent(AudioSource);
+        const audioSource = node.addComponent(AudioSource);
         audioSource.playOnAwake = false;
         audioSource.clip = asset.src;
         node.parent = this.gameNode;
         node.active = true;
-        node.setPosition(new Vec3(0, 0, 0));
-        node.on(AudioSource.EventType.ENDED, onEnd);
-        const player =  audioSource;
+        node.setPosition(Vec3.ZERO);
+        if (onEnd) {
+            node.on(AudioSource.EventType.ENDED, onEnd);
+        }
         return {
             id,
-            player,
+            player: audioSource,
             loop: false,
             asset,
             isPlaying: false,

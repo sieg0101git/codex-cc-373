@@ -46,7 +46,10 @@ export class gccSoundBase extends Component {
         gccRegisterEvent(gccGameEvent.SOUND.UPDATE_BGM_VOL_SETTING, this.updateBGMSettingVolume, this);
         gccRegisterEvent(gccGameEvent.SOUND.UPDATE_SFX_VOL_SETTING, this.updateSFXSettingVolume, this);
 
-        this.node.setSiblingIndex(this.node.parent.children.length + 1);
+        const parentNode = this.node.parent;
+        if (parentNode) {
+            this.node.setSiblingIndex(parentNode.children.length + 1);
+        }
         this.initAssets();
     }
 
@@ -71,14 +74,18 @@ export class gccSoundBase extends Component {
             ENABLE_BGM,
             ENABLE_SFX
         } = loadConfigAsync.getConfig();
-        this.storageKeyBGM = ENABLE_BGM ? ENABLE_BGM : this.storageKeyBGM;
-        this.storageKeySFX = ENABLE_SFX ? ENABLE_SFX : this.storageKeySFX;
-        let isEnabledBgm = sys.localStorage.getItem(this.storageKeyBGM);
-        let isEnabledSfx = sys.localStorage.getItem(this.storageKeySFX);
-        this.bgmChannel.channelEnabled = (isEnabledBgm != null) ? JSON.parse(isEnabledBgm) : true;
-        this.sfxChannel.channelEnabled = (isEnabledSfx != null) ? JSON.parse(isEnabledSfx) : true;
-        let bgmVolume = this.bgmChannel.channelEnabled ? 1 : 0;
-        let sfxVolume = this.sfxChannel.channelEnabled ? 1 : 0;
+        if (ENABLE_BGM) {
+            this.storageKeyBGM = ENABLE_BGM;
+        }
+        if (ENABLE_SFX) {
+            this.storageKeySFX = ENABLE_SFX;
+        }
+        const isEnabledBgm = sys.localStorage.getItem(this.storageKeyBGM);
+        const isEnabledSfx = sys.localStorage.getItem(this.storageKeySFX);
+        this.bgmChannel.channelEnabled = isEnabledBgm != null ? JSON.parse(isEnabledBgm) : true;
+        this.sfxChannel.channelEnabled = isEnabledSfx != null ? JSON.parse(isEnabledSfx) : true;
+        const bgmVolume = this.bgmChannel.channelEnabled ? 1 : 0;
+        const sfxVolume = this.sfxChannel.channelEnabled ? 1 : 0;
         this.bgmChannel.setChannelVolume(bgmVolume);
         this.sfxChannel.setChannelVolume(sfxVolume);
     }
@@ -126,8 +133,11 @@ export class gccSoundBase extends Component {
     }
 
     protected onEventShow(): void {
-        const currentBgm = this.bgmChannel.activeInstances.keys().next().value;
-        this.bgmChannel.resume(currentBgm);
+        const iterator = this.bgmChannel.activeInstances.keys();
+        const first = iterator.next();
+        if (!first.done) {
+            this.bgmChannel.resume(first.value);
+        }
     }
 
     public setVolumeBGM(value: number) {
@@ -173,9 +183,14 @@ export class gccSoundBase extends Component {
     }
 
     public resumeAll(): void {
-        const currentBgm = this.bgmChannel.activeInstances.keys().next().value;
-        this.bgmChannel.resume(currentBgm);
-        this.sfxChannel.activeInstances.forEach((_inst, key) => this.sfxChannel.resume(key));
+        const bgmIterator = this.bgmChannel.activeInstances.keys();
+        const first = bgmIterator.next();
+        if (!first.done) {
+            this.bgmChannel.resume(first.value);
+        }
+        this.sfxChannel.activeInstances.forEach((_inst, key) => {
+            this.sfxChannel.resume(key);
+        });
     }
 
     public pauseAll() {

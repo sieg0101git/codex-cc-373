@@ -28,7 +28,7 @@ export abstract class gccSoundChannel {
 
     async load(asset: ISoundAsset): Promise<void> {
         await this.adapter.loadAsset(asset);
-        this.instancePool.set(asset.key, []);
+        this.ensurePool(asset.key);
     }
 
     async unload(asset: ISoundAsset): Promise<void> {
@@ -40,21 +40,29 @@ export abstract class gccSoundChannel {
             }
         });
         // Clear pool for key
-        const pool = this.instancePool.get(asset.key) || [];
-        pool.forEach(inst => this.adapter.stop(inst));
+        const pool = this.instancePool.get(asset.key);
+        if (pool) {
+            const { length } = pool;
+            for (let index = 0; index < length; index += 1) {
+                const inst = pool[index];
+                this.adapter.stop(inst);
+            }
+        }
         this.instancePool.delete(asset.key);
     }
 
     public initSoundAssets(assets: ISoundAsset[]): void {
-        assets.forEach(asset => {
+        const { length } = assets;
+        for (let index = 0; index < length; index += 1) {
+            const asset = assets[index];
             this.adapter.initAsset(asset);
-            this.instancePool.set(asset.key, []);
-        });
+            this.ensurePool(asset.key);
+        }
     }
 
-    async play(key: string, options?: any): Promise<string> {
+    async play(key: string, options?: any): Promise<string | null> {
         if (!this.instancePool.has(key)) {
-            return;
+            return null;
         }
         if (this.activeInstances.size >= this.config.maxInstances) {
             const oldestKey = this.activeInstances.keys().next().value;
@@ -63,13 +71,20 @@ export abstract class gccSoundChannel {
         if (this.adapter.isWebSound === true && this.adapter.getStateAudioContext() === 'suspended') {
             await this.adapter.ensureAudioUnlocked();
         }
-        let instance = this.instancePool.get(key)?.pop();
+        const pool = this.ensurePool(key);
+        let instance = pool.pop();
         if (!instance) {
             instance = this.adapter.createInstance(key, {
                 onEnd: () => {
                     this.stop(instance.id);
+                    if (options && typeof options.onEnd === "function") {
+                        options.onEnd();
+                    }
                 }
             });
+            if (!instance) {
+                return null;
+            }
         }
         const loop = options && options.loop ? options.loop : false;
         const volume = this.channelEnabled ? (options?.volume ?? this.channelVolume): 0;
@@ -79,19 +94,26 @@ export abstract class gccSoundChannel {
         this.activeInstances.set(instance.id, instance);
         return instance.id;
     }
-    async playOneShot(key: string, options?: any): Promise<string> {
+    async playOneShot(key: string, options?: any): Promise<string | null> {
         if (this.activeInstances.size >= this.config.maxInstances) {
             const oldestKey = this.activeInstances.keys().next().value;
             this.stop(oldestKey);
         }
         await this.adapter.ensureAudioUnlocked();
-        let instance = this.instancePool.get(key)?.pop();
+        const pool = this.ensurePool(key);
+        let instance = pool.pop();
         if (!instance) {
             instance = this.adapter.createInstance(key, {
                 onEnd: () => {
                     this.stop(instance.id);
+                    if (options && typeof options.onEnd === "function") {
+                        options.onEnd();
+                    }
                 }
             });
+            if (!instance) {
+                return null;
+            }
         }
         const loop = options && options.loop ? options.loop : false;
         const volume = this.channelEnabled ? (options?.volume ?? this.channelVolume): 0;
@@ -107,12 +129,12 @@ export abstract class gccSoundChannel {
         const instance = this.activeInstances.get(id);
         if (instance) {
             this.adapter.pause(instance);
-            const pool = this.instancePool.get(instance.asset.key);
+            const pool = this.ensurePool(instance.asset.key);
             if (pool.length < this.config.maxPoolSize) {
                 pool.push(instance);
-            } else {
-                this.adapter.pause(instance);
+                return;
             }
+            this.adapter.stop(instance);
         }
     }
 
@@ -128,7 +150,10 @@ export abstract class gccSoundChannel {
         if (instance) {
             this.adapter.stop(instance);
             this.activeInstances.delete(id);
-            this.instancePool.get(instance.asset.key)?.push(instance);
+            const pool = this.ensurePool(instance.asset.key);
+            if (pool.length < this.config.maxPoolSize) {
+                pool.push(instance);
+            }
         }
     }
 
@@ -209,6 +234,15 @@ export abstract class gccSoundChannel {
             }
         }
         return ret;
+    }
+
+    protected ensurePool(key: string): gccSoundInstance[] {
+        let pool = this.instancePool.get(key);
+        if (!pool) {
+            pool = [];
+            this.instancePool.set(key, pool);
+        }
+        return pool;
     }
 }
 
