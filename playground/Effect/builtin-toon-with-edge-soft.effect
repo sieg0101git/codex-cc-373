@@ -202,11 +202,13 @@ CCProgram toon-fs %{
   #endif
 
   void surf (out ToonSurface s) {
-    s.shade2 = shadeColor2.rgb * colorScaleAndCutoff.rgb;
+    vec3 colorScale = colorScaleAndCutoff.rgb;
+
+    s.shade2 = shadeColor2.rgb * colorScale;
     #if USE_2ND_SHADE_MAP
       s.shade2 *= SRGBToLinear(texture(shadeMap2, v_uv).rgb);
     #endif
-    s.shade1 = shadeColor1.rgb * colorScaleAndCutoff.rgb;
+    s.shade1 = shadeColor1.rgb * colorScale;
     #if USE_1ST_SHADE_MAP
       s.shade1 *= SRGBToLinear(texture(shadeMap1, v_uv).rgb);
       #if SHADE_MAP_1_AS_SHADE_MAP_2
@@ -227,7 +229,7 @@ CCProgram toon-fs %{
       #endif
     #endif
     s.baseColor = localBaseColor;
-    s.baseColor.rgb *= colorScaleAndCutoff.xyz;
+    s.baseColor.rgb *= colorScale;
 
     #if USE_ALPHA_TEST
       if (s.baseColor.ALPHA_TEST_CHANNEL < colorScaleAndCutoff.w) discard;
@@ -236,10 +238,11 @@ CCProgram toon-fs %{
     vec3 worldNormal = normalize(v_normal);
 
     #if USE_NORMAL_MAP
+      float normalStrength = emissiveScaleAndStrenth.w;
       vec3 tangent = normalize(v_tangent.xyz);
       vec3 bitangent = normalize(cross(worldNormal, tangent)) * (v_tangent.w > 0.0 ? 1.0 : -1.0);
       vec3 normalSample = texture(normalMap, v_uv).xyz * 2.0 - 1.0;
-      normalSample.xy *= emissiveScaleAndStrenth.w;
+      normalSample.xy *= normalStrength;
       mat3 tbn = mat3(tangent, bitangent, worldNormal);
       worldNormal = normalize(tbn * normalSample);
     #endif
@@ -257,11 +260,12 @@ CCProgram toon-fs %{
       s.specular.rgb *= SRGBToLinear(texture(specularMap, v_uv).rgb);
     #endif
 
-    s.emissive = emissive.rgb * emissiveScaleAndStrenth.xyz;
+    vec3 emissiveScale = emissiveScaleAndStrenth.xyz;
+    s.emissive = emissive.rgb * emissiveScale;
 
     #if USE_INSTANCING
       float emissionWeight = step(0.01, v_emission_color.a);
-      s.emissive = mix(s.emissive, v_emission_color.rgb * emissiveScaleAndStrenth.xyz, emissionWeight);
+      s.emissive = mix(s.emissive, v_emission_color.rgb * emissiveScale, emissionWeight);
       s.baseColor.a = mix(s.baseColor.a, v_emission_color.a, emissionWeight);
 
       #if USE_DISAPPEAR_MAP
