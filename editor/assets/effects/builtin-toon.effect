@@ -167,8 +167,7 @@ CCProgram surface-fragment %{
         shade2 *= texColor.rgb;
       #endif
     #endif
-    baseColorAndTransparency = color;
-    baseColorAndTransparency.rgb *= colorScaleAndCutoff.xyz;
+    baseColorAndTransparency = vec4(color.rgb * colorScaleAndCutoff.xyz, color.a);
 
     #if USE_ALPHA_TEST
       if (baseColorAndTransparency.ALPHA_TEST_CHANNEL < colorScaleAndCutoff.w) discard;
