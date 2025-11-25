@@ -143,11 +143,13 @@ CCProgram surface-fragment %{
   #define CC_SURFACES_FRAGMENT_MODIFY_BASECOLOR_AND_TOONSHADE
   void SurfacesFragmentModifyBaseColorAndToonShade(out vec4 baseColorAndTransparency, out vec3 shade1, out vec3 shade2)
   {
-    shade2 = shadeColor2.rgb * colorScaleAndCutoff.rgb;
+    vec3 colorScale = colorScaleAndCutoff.xyz;
+
+    shade2 = shadeColor2.rgb * colorScale;
     #if USE_2ND_SHADE_MAP
       shade2 *= SRGBToLinear(texture(shadeMap2, FSInput_texcoord).rgb);
     #endif
-    shade1 = shadeColor1.rgb * colorScaleAndCutoff.rgb;
+    shade1 = shadeColor1.rgb * colorScale;
     #if USE_1ST_SHADE_MAP
       shade1 *= SRGBToLinear(texture(shadeMap1, FSInput_texcoord).rgb);
       #if SHADE_MAP_1_AS_SHADE_MAP_2
@@ -168,7 +170,7 @@ CCProgram surface-fragment %{
       #endif
     #endif
     baseColorAndTransparency = color;
-    baseColorAndTransparency.rgb *= colorScaleAndCutoff.xyz;
+    baseColorAndTransparency.rgb *= colorScale;
 
     #if USE_ALPHA_TEST
       if (baseColorAndTransparency.ALPHA_TEST_CHANNEL < colorScaleAndCutoff.w) discard;
@@ -191,10 +193,12 @@ CCProgram surface-fragment %{
   #define CC_SURFACES_FRAGMENT_MODIFY_WORLD_NORMAL
   vec3 SurfacesFragmentModifyWorldNormal()
   {
-    vec3 normal = FSInput_worldNormal;
+    vec3 worldNormal = normalize(FSInput_worldNormal);
+    vec3 normal = worldNormal;
     #if USE_NORMAL_MAP
       vec3 nmmp = texture(normalMap, FSInput_texcoord).xyz - vec3(0.5);
-      normal = CalculateNormalFromTangentSpace(nmmp, emissiveScaleAndStrenth.w, normalize(normal.xyz), normalize(FSInput_worldTangent), FSInput_mirrorNormal);
+      vec3 tangent = normalize(FSInput_worldTangent);
+      normal = CalculateNormalFromTangentSpace(nmmp, emissiveScaleAndStrenth.w, worldNormal, tangent, FSInput_mirrorNormal);
     #endif
 
     return normalize(normal);
