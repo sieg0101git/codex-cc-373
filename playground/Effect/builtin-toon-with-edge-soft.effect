@@ -1,8 +1,8 @@
-// Copyright (c) 2017-2022 Xiamen Yaji Software Co., Ltd.
-
+// Copyright (c) 2017-2020 Xiamen Yaji Software Co., Ltd.
 CCEffect %{
   techniques:
-  - passes:
+  - name: opaque
+    passes:
     - switch: USE_OUTLINE_PASS
       vert: silhouette-edge-vs
       frag: silhouette-edge-fs
@@ -12,74 +12,41 @@ CCEffect %{
         depthFunc: less_equal
         depthTest: true
         depthWrite: true
-      properties:
+      properties: &propssd
         lineWidth:     { value: 10, target: outlineParams.x }
         depthBias:     { value: 0,  target: outlineParams.y }
         baseColor:     { editor: { type: color } }
         baseColorMap:  { value: grey }
-    - vert: toon-vs
-      frag: toon-fs
-      blendState:
-        targets:
-        - blend: true
-          blendSrc: src_alpha
-          blendDst: one_minus_src_alpha
-          blendSrcAlpha: one
-          blendDstAlpha: one_minus_src_alpha
+    - vert: unlit-vs:vert
+      frag: unlit-fs:frag
       properties: &props
-        tilingOffset:   { value: [1.0, 1.0, 0.0, 0.0] }
-        mainColor:      { value: [0.6, 0.6, 0.6, 1.0], target: baseColor, linear: true, editor: { displayName: BaseColor, type: color } }
-        colorScale:     { value: [1.0, 1.0, 1.0], target: colorScaleAndCutoff.xyz }
-        alphaThreshold: { value: 0.5, target: colorScaleAndCutoff.w, editor: { parent: USE_ALPHA_TEST } }
-        alphaFeatherWidth: { value: 0.02, target: miscParams.y, editor: { parent: USE_ALPHA_FEATHER, displayName: Alpha Feather Width, slide: true, range: [0.0, 0.2], step: 0.0001 } }
-        shadeColor1:    { value: [0.4, 0.4, 0.4, 1.0], linear: true, editor: { type: color } }
-        shadeColor2:    { value: [0.2, 0.2, 0.2, 1.0], linear: true, editor: { type: color } }
-        specular:       { value: [1.0, 1.0, 1.0, 0.3], linear: true, editor: { type: color } }
-        baseStep:       { value: 0.8,   target: shadeParams.x }
-        baseFeather:    { value: 0.001, target: shadeParams.y }
-        shadeStep:      { value: 0.5,   target: shadeParams.z }
-        shadeFeather:   { value: 0.001, target: shadeParams.w }
-        shadowCover:    { value: 0.5,   target: miscParams.x, editor: { slide: true, range: [0, 1.0], step: 0.001 } }
-        emissive:       { value: [0.0, 0.0, 0.0, 1.0], linear: true, editor: { type: color } }
-        emissiveScale:  { value: [1.0, 1.0, 1.0], target: emissiveScaleAndStrenth.xyz }
-        normalStrength: { value: 1.0, target: emissiveScaleAndStrenth.w, editor: { parent: USE_NORMAL_MAP }, slide: true, range: [0, 5.0], step: 0.001 }
-        normalMap:      { value: normal }
         mainTexture:    { value: white, target: baseColorMap, editor: { displayName: BaseColorMap } }
-        shadeMap1:      { value: white  }
-        shadeMap2:      { value: white  }
-        specularMap:    { value: white  }
-        emissiveMap:    { value: grey   }
-        webgl1FxaaLumaThreshold: { value: 0.02, target: fxaaParams.x, editor: { parent: USE_WEBGL1_SIMPLE_FXAA, displayName: WebGL1 FXAA Luma Threshold, slide: true, range: [0.0, 0.1], step: 0.0001 } }
-        webgl1FxaaBlendStrength: { value: 24.0, target: fxaaParams.y, editor: { parent: USE_WEBGL1_SIMPLE_FXAA, displayName: WebGL1 FXAA Blend Strength, slide: true, range: [0.0, 32.0], step: 0.01 } }
-    - vert: toon-vs
-      frag: toon-fs
-      phase: forward-add
-      propertyIndex: 1
-      embeddedMacros: { CC_FORWARD_ADD: true }
-      depthStencilState:
-        depthFunc: equal
-        depthTest: true
-        depthWrite: false
-      blendState:
-        targets:
-        - blend: true
-          blendSrc: one
-          blendDst: one
-          blendSrcAlpha: zero
-          blendDstAlpha: one
-      properties: *props
-    - vert: shadow-caster-vs
-      frag: shadow-caster-fs
+        tilingOffset:   { value: [1, 1, 0, 0] }
+        mainColor:      { value: [1, 1, 1, 1], linear: true, editor: { type: color } }
+        colorScale:     { value: [1, 1, 1], target: colorScaleAndCutoff.xyz }
+        alphaThreshold: { value: 0.5, target: colorScaleAndCutoff.w, editor: { parent: USE_ALPHA_TEST } }
+        color:          { target: mainColor, linear: true, editor: { visible: false } } # backward compability
+        saturation:  { value: 1.0, target: adjustParams.x, editor: { slide: true, range: [0.0, 2.0], step: 0.05 } }
+        lightness:  { value: 0.0, target: adjustParams.y, editor: { slide: true, range: [-1.0, 2.0], step: 0.01 } }
+        emissiveStrength : { value: 1.0, target: adjustParams.z, editor: { slide: true, range: [0, 5.0], step: 0.05, displayName: Emissive } }
+        rimColor: { value: [1, 1, 1, 1], editor: { type: color } }
+        rimIntensity: { value: 1.0, target: rimParams.x, editor: { slide: true, range: [0, 10], step: 0.1 } }
+        rimSpread: { value: 0.5, target: rimParams.y, editor: { slide: true, range: [0, 5], step: 0.01 } }
+        shadowCover: { value: 0.5, target: adjustParams.w, editor: { slide: true, range: [0, 1.0], step: 0.001 } }
+      migrations: &migs
+        properties:
+          mainColor:    { formerlySerializedAs: color }
+    - vert: shadow-caster-vs:vert
+      frag: shadow-caster-fs:frag
       phase: shadow-caster
       propertyIndex: 1
       rasterizerState:
         cullMode: front
-      properties:
+      properties: &props1
         tilingOffset:   { value: [1.0, 1.0, 0.0, 0.0] }
         mainColor:      { value: [0.6, 0.6, 0.6, 1.0], target: baseColor, editor: { displayName: BaseColor, type: color } }
         colorScale:     { value: [1.0, 1.0, 1.0], target: colorScaleAndCutoff.xyz }
         alphaThreshold: { value: 0.5, target: colorScaleAndCutoff.w, editor: { parent: USE_ALPHA_TEST } }
-        alphaFeatherWidth: { value: 0.02, target: miscParams.y, editor: { parent: USE_ALPHA_FEATHER, displayName: Alpha Feather Width, slide: true, range: [0.0, 0.2], step: 0.0001 } }
         shadeColor1:    { value: [0.4, 0.4, 0.4, 1.0], editor: { type: color } }
         shadeColor2:    { value: [0.2, 0.2, 0.2, 1.0], editor: { type: color } }
         specular:       { value: [1.0, 1.0, 1.0, 0.3], editor: { type: color } }
@@ -91,321 +58,287 @@ CCEffect %{
         emissiveScale:  { value: [1.0, 1.0, 1.0], target: emissiveScaleAndStrenth.xyz }
         normalStrenth:  { value: 1.0, target: emissiveScaleAndStrenth.w, editor: { parent: USE_NORMAL_MAP } }
         mainTexture:    { value: white, target: baseColorMap, editor: { displayName: BaseColorMap } }
+
+
+  - name: transparent
+    passes:
+    - switch: USE_OUTLINE_PASS
+      vert: silhouette-edge-vs
+      frag: silhouette-edge-fs
+      rasterizerState:
+        cullMode: front
+      depthStencilState:
+        depthFunc: less_equal
+        depthTest: true
+        depthWrite: true
+      properties: *propssd
+
+    - vert: unlit-vs:vert
+      frag: unlit-fs:frag
+      depthStencilState: &d1
+        depthTest: true
+        depthWrite: false
+      blendState:
+        targets:
+        - blend: true
+          blendSrc: src_alpha
+          blendDst: one_minus_src_alpha
+          blendDstAlpha: one_minus_src_alpha
+      properties: *props
+      migrations: *migs
+    - vert: shadow-caster-vs:vert
+      frag: shadow-caster-fs:frag
+      phase: shadow-caster
+      propertyIndex: 1
+      rasterizerState:
+        cullMode: front
+      depthStencilState:
+        depthTest: true
+        depthWrite: true
+        depthFunc: less_equal
+      properties: &props1
+
+
+
+
+  - name: add
+    passes:
+    - vert: unlit-vs:vert
+      frag: unlit-fs:frag
+      rasterizerState: &r1 { cullMode: none }
+      depthStencilState: *d1
+      blendState:
+        targets:
+        - blend: true
+          blendSrc: src_alpha
+          blendDst: one
+          blendSrcAlpha: src_alpha
+          blendDstAlpha: one
+      properties: *props
+      migrations: *migs
+  - name: alpha-blend
+    passes:
+    - vert: unlit-vs:vert
+      frag: unlit-fs:frag
+      rasterizerState: *r1
+      depthStencilState: *d1
+      blendState:
+        targets:
+        - blend: true
+          blendSrc: src_alpha
+          blendDst: one_minus_src_alpha
+          blendSrcAlpha: src_alpha
+          blendDstAlpha: one_minus_src_alpha
+      properties: *props
+      migrations: *migs
 }%
 
-CCProgram shared-ubos %{
-  uniform Constants {
-    vec4 tilingOffset;
-    vec4 baseColor;
-    vec4 colorScaleAndCutoff;
-    vec4 shadeColor1;
-    vec4 shadeColor2;
-    vec4 specular; // xyz: specular color, w: power
-    vec4 shadeParams;
-    vec4 miscParams; // x: shadow cover, y: alpha feather half-width
-    vec4 emissive;
-    vec4 emissiveScaleAndStrenth;
-    vec4 fxaaParams; // x: contrast threshold, y: blend strength
-  };}%
+CCProgram unlit-vs %{
+  precision highp float;
+  #include <legacy/input>
+  #include <builtin/uniforms/cc-global>
+  #include <legacy/decode-base>
+  #include <legacy/local-batch>
+  #include <legacy/input>
+  #include <legacy/fog-vs>
+  #include <legacy/shadow-map-vs>
 
-CCProgram macro-remapping %{
-  // if enabled, shadowed area is very dark
-  #pragma define-meta USE_COMPATIBLE_LIGHTING
-  #define CC_SURFACES_USE_LEGACY_COMPATIBLE_LIGHTING USE_COMPATIBLE_LIGHTING
+  #if USE_VERTEX_COLOR
+    in lowp vec4 a_color;
+    out lowp vec4 v_color;
+  #endif
 
-  #pragma define-meta USE_NORMAL_MAP
-  #define CC_SURFACES_USE_TANGENT_SPACE USE_NORMAL_MAP
+  // Rim light outputs
+  out vec3 v_position;
+  out vec3 v_normal;
 
-  #pragma define-meta USE_WEBGL1_SIMPLE_FXAA
-  #pragma define-meta USE_ALPHA_FEATHER editor({ displayName: Alpha Feather Blend })
-}%
+  // v_all
+  out vec3 v_position_all;
+  out vec3 v_normal_all;
 
-CCProgram surface-vertex %{
-  #define CC_SURFACES_VERTEX_MODIFY_UV
-  void SurfacesVertexModifyUV(inout SurfacesStandardVertexIntermediate In)
-  {
-    In.texCoord = In.texCoord * tilingOffset.xy + tilingOffset.zw;
+  #if USE_TEXTURE
+    out vec2 v_uv;
+    uniform TexCoords {
+      vec4 tilingOffset;
+    };
+  #endif
+
+  #if CC_RECEIVE_SHADOW
+    out mediump vec2 v_shadowBias;
+  #endif
+
+  vec4 vert () {
+    vec4 position;
+    CCVertInput(position);
+
+    mat4 matWorld, matWorldIT;
+    CCGetWorldMatrixFull(matWorld, matWorldIT);
+
+
+    #if USE_TEXTURE
+      v_uv = a_texCoord * tilingOffset.xy + tilingOffset.zw;
+      #if SAMPLE_FROM_RT
+        CC_HANDLE_RT_SAMPLE_FLIP(v_uv);
+      #endif
+    #endif
+
+
+    #if USE_VERTEX_COLOR
+      v_color = a_color;
+    #endif
+
+    #if USE_RIM_LIGHT
+    v_position = (matWorld * position).xyz;
+    v_normal   = normalize((matWorldIT * vec4(a_normal, 0.0)).xyz);
+    #endif
+
+    v_position_all = (matWorld * position).xyz;
+    v_normal_all   = normalize((matWorldIT * vec4(a_normal, 0.0)).xyz);
+
+    #if CC_RECEIVE_SHADOW
+      v_shadowBias = CCGetShadowBias();
+    #endif
+
+    vec4 pos = matWorld * position;
+    CC_TRANSFER_SHADOW(pos);
+
+    CC_TRANSFER_FOG(matWorld * position);
+    return cc_matProj * (cc_matView * matWorld) * position;
   }
 }%
 
-CCProgram surface-fragment %{
-  #pragma extension([GL_OES_standard_derivatives, __VERSION__ < 300])
-  #if USE_BASE_COLOR_MAP
-    uniform sampler2D baseColorMap;
-  #endif
-
-  #if USE_NORMAL_MAP
-    uniform sampler2D normalMap;
-  #endif
-
-  #if USE_1ST_SHADE_MAP
-    uniform sampler2D shadeMap1;
-  #endif
-  #if USE_2ND_SHADE_MAP
-    uniform sampler2D shadeMap2;
-  #endif
-  #if USE_SPECULAR_MAP
-    uniform sampler2D specularMap;
-  #endif
-  #if USE_EMISSIVE_MAP
-    uniform sampler2D emissiveMap;
+CCProgram unlit-fs %{
+  precision highp float;
+  #include <legacy/output-standard>
+  #include <legacy/fog-fs>
+  #if CC_RECEIVE_SHADOW
+    #include <legacy/shadow-map-fs>
   #endif
 
   #if USE_ALPHA_TEST
     #pragma define-meta ALPHA_TEST_CHANNEL options([a, r, g, b])
   #endif
 
+  #if USE_TEXTURE
+    in vec2 v_uv;
 
-  #define CC_SURFACES_FRAGMENT_MODIFY_BASECOLOR_AND_TOONSHADE
-  void SurfacesFragmentModifyBaseColorAndToonShade(out vec4 baseColorAndTransparency, out vec3 shade1, out vec3 shade2)
-  {
-    shade2 = shadeColor2.rgb * colorScaleAndCutoff.rgb;
-    #if USE_2ND_SHADE_MAP
-      shade2 *= SRGBToLinear(texture(shadeMap2, FSInput_texcoord).rgb);
-    #endif
-    shade1 = shadeColor1.rgb * colorScaleAndCutoff.rgb;
-    #if USE_1ST_SHADE_MAP
-      shade1 *= SRGBToLinear(texture(shadeMap1, FSInput_texcoord).rgb);
-      #if SHADE_MAP_1_AS_SHADE_MAP_2
-        shade2 *= shade1.rgb;
-      #endif
+    uniform sampler2D baseColorMap;
+  #endif
+
+  // Main material properties
+  uniform Constant {
+    vec4 mainColor;
+    vec4 colorScaleAndCutoff;
+    vec4 adjustParams; // x: saturation, y: lightness, z: emissive, w: shadow cover
+  };
+
+  // Rim light properties
+  #if USE_RIM_LIGHT
+  in vec3 v_position;
+  in vec3 v_normal;
+  uniform RimLight {
+    vec4 rimColor;
+    vec2 rimParams; // x: intensity, y: spread
+  };
+  #endif
+
+  in vec3 v_position_all;
+  in vec3 v_normal_all;
+
+  #if USE_VERTEX_COLOR
+    in lowp vec4 v_color;
+  #endif
+
+  #if CC_RECEIVE_SHADOW
+    in mediump vec2 v_shadowBias;
+  #endif
+
+  vec3 adjustSaturation(vec3 color, float sat) {
+    float gray = dot(color, vec3(0.299, 0.587, 0.114));
+    return mix(vec3(gray), color, sat);
+  }
+
+  vec3 adjustLightness(vec3 color, float l) {
+    return color + vec3(l); // cộng offset sáng
+  }
+
+  vec3 adjustEmissive(vec3 color, float e) {
+    return color * vec3(e);
+  }
+
+  vec4 frag () {
+    float saturation = adjustParams.x;
+    float lightness = adjustParams.y;
+    float emissiveStrength = adjustParams.z;
+    float shadowCover = adjustParams.w;
+
+    vec4 o = mainColor;
+    o.rgb *= colorScaleAndCutoff.xyz;
+
+    #if USE_VERTEX_COLOR
+      o.rgb *= SRGBToLinear(v_color.rgb);//use linear
+      o.a *= v_color.a;
     #endif
 
-    vec4 color = baseColor;
-    #if USE_BASE_COLOR_MAP
-      vec2 texCoord = FSInput_texcoord;
-      vec4 texColor = texture(baseColorMap, texCoord);
+    #if USE_TEXTURE
+      vec4 texColor = texture(baseColorMap, v_uv);
       texColor.rgb = SRGBToLinear(texColor.rgb);
-      #if USE_WEBGL1_SIMPLE_FXAA
-        // webgl1FxaaLumaThreshold(fxaaParams.x) & webgl1FxaaBlendStrength(fxaaParams.y)
-        const vec3 lumaCoeff = vec3(0.299, 0.587, 0.114);
-        vec2 fxaaTexel = max(fwidth(texCoord), vec2(1e-5));
-        vec2 fxaaDir = fxaaTexel * vec2(1.0, -1.0);
-        vec3 rgbM = texColor.rgb;
-        vec3 rgbNW = SRGBToLinear(texture(baseColorMap, texCoord - fxaaTexel).rgb);
-        vec3 rgbNE = SRGBToLinear(texture(baseColorMap, texCoord + fxaaDir).rgb);
-        vec3 rgbSW = SRGBToLinear(texture(baseColorMap, texCoord - fxaaDir).rgb);
-        vec3 rgbSE = SRGBToLinear(texture(baseColorMap, texCoord + fxaaTexel).rgb);
-        float lumaNW_NE = lumaCoeff.r * (rgbNW.r + rgbNE.r) + lumaCoeff.g * (rgbNW.g + rgbNE.g) + lumaCoeff.b * (rgbNW.b + rgbNE.b);
-        float lumaSW_SE = lumaCoeff.r * (rgbSW.r + rgbSE.r) + lumaCoeff.g * (rgbSW.g + rgbSE.g) + lumaCoeff.b * (rgbSW.b + rgbSE.b);
-        float lumaM = dot(rgbM, lumaCoeff);
-        float lumaNW = lumaCoeff.r * rgbNW.r + lumaCoeff.g * rgbNW.g + lumaCoeff.b * rgbNW.b;
-        float lumaNE = lumaCoeff.r * rgbNE.r + lumaCoeff.g * rgbNE.g + lumaCoeff.b * rgbNE.b;
-        float lumaSW = lumaCoeff.r * rgbSW.r + lumaCoeff.g * rgbSW.g + lumaCoeff.b * rgbSW.b;
-        float lumaSE = lumaCoeff.r * rgbSE.r + lumaCoeff.g * rgbSE.g + lumaCoeff.b * rgbSE.b;
-        float lumaMin = min(lumaM, min(min(lumaNW, lumaNE), min(lumaSW, lumaSE)));
-        float lumaMax = max(lumaM, max(max(lumaNW, lumaNE), max(lumaSW, lumaSE)));
-        float lumaRange = lumaMax - lumaMin;
-        if (lumaRange >= fxaaParams.x) {
-          vec2 dir;
-          dir.x = -(lumaNW_NE - lumaSW_SE);
-          dir.y =  (lumaNW + lumaSW) - (lumaNE + lumaSE);
-          float blendStrength = clamp(fxaaParams.y * (1.0 / 32.0), 0.0, 1.0);
-          float effectWeight = blendStrength * blendStrength;
-          float dirReduce = max((lumaNW_NE + lumaSW_SE) * 0.125, mix(1.0 / 256.0, 1.0 / 32.0, effectWeight));
-          float rcpDirMin = 1.0 / (min(abs(dir.x), abs(dir.y)) + dirReduce);
-          float spanMax = mix(2.0, 12.0, effectWeight);
-          dir = clamp(dir * rcpDirMin, vec2(-spanMax), vec2(spanMax)) * fxaaTexel;
-          vec2 halfDir = dir * 0.5;
-          vec2 dirOneThird = dir * (1.0 / 3.0);
-          vec2 dirTwoThird = dir * (2.0 / 3.0);
-          vec3 rgbA = 0.5 * (
-            SRGBToLinear(texture(baseColorMap, texCoord + dirOneThird - halfDir).rgb) +
-            SRGBToLinear(texture(baseColorMap, texCoord + dirTwoThird - halfDir).rgb)
-          );
-          vec3 rgbB = rgbA * 0.5 + 0.25 * (
-            SRGBToLinear(texture(baseColorMap, texCoord - halfDir).rgb) +
-            SRGBToLinear(texture(baseColorMap, texCoord + halfDir).rgb)
-          );
-          float lumaB = dot(rgbB, lumaCoeff);
-          vec3 rgbFinal = ((lumaB < lumaMin) || (lumaB > lumaMax)) ? rgbA : rgbB;
-          texColor.rgb = mix(rgbM, rgbFinal, effectWeight);
-        }
-      #endif
-      color *= texColor;
-      #if BASE_COLOR_MAP_AS_SHADE_MAP_1
-        shade1 *= texColor.rgb;
-      #endif
-      #if BASE_COLOR_MAP_AS_SHADE_MAP_2
-        shade2 *= texColor.rgb;
-      #endif
+      o *= texColor;
     #endif
-    baseColorAndTransparency = color;
-    baseColorAndTransparency.rgb *= colorScaleAndCutoff.xyz;
+
+    o.rgb = adjustSaturation(o.rgb, saturation);
+    o.rgb = adjustLightness(o.rgb, lightness);
+    o.rgb = adjustEmissive(o.rgb, emissiveStrength);
+
+     #if USE_TEXTURE_EMISSIVE
+      o.rgb *= texColor.rgb;
+    #endif
 
     #if USE_ALPHA_TEST
-      float alphaSignal = clamp(baseColorAndTransparency.ALPHA_TEST_CHANNEL, 0.0, 1.0);
-      #if USE_ALPHA_FEATHER
-        // alphaFeatherWidth drives miscParams.y to soften the cutoff
-        float feather = clamp(miscParams.y, 1e-6, 1.0);
-        float threshold = clamp(colorScaleAndCutoff.w, 0.0, 1.0);
-        float softAlpha = smoothstep(threshold - feather, threshold + feather, alphaSignal);
-        baseColorAndTransparency.a *= softAlpha;
-        if (softAlpha <= 0.0) discard;
-      #else
-        if (alphaSignal < colorScaleAndCutoff.w) discard;
+      if (o.ALPHA_TEST_CHANNEL < colorScaleAndCutoff.w) discard;
+    #endif
+
+    #if USE_RIM_LIGHT
+    // Rim light calculation
+    float rimIntensity = rimParams.x;
+    float rimSpread = rimParams.y;
+    vec3 viewDir = normalize(cc_cameraPos.xyz - v_position);
+    float NdotV = 1.0 - max(0.0, dot(normalize(v_normal), viewDir));
+    float rim = smoothstep(1.0 - rimSpread, 1.0, NdotV);
+    o.rgb += rimColor.rgb * rim * rimIntensity;
+    #endif
+
+    vec3 position = v_position_all;
+    vec3 V = normalize(cc_cameraPos.xyz - v_position_all);
+    vec3 N = normalize(v_normal_all);
+    vec3 L = normalize(-cc_mainLitDir.xyz);
+    float NL = 0.5 * dot(N, L) + 0.5;
+    float NH = 0.5 * dot(normalize(V + L), N) + 0.5;
+    float shadow = 1.0;
+    #if CC_RECEIVE_SHADOW && CC_SHADOW_TYPE == CC_SHADOW_MAP
+    if(shadowCover < NL && cc_mainLitDir.w > 0.0) {
+      #if CC_DIR_LIGHT_SHADOW_TYPE == CC_DIR_LIGHT_SHADOW_CASCADED
+        shadow = CCCSMFactorBase(position, N, v_shadowBias);
       #endif
-    #elif USE_ALPHA_FEATHER
-      // Allow feathered blending even khi không bật alpha test
-      float softAlpha = clamp(baseColorAndTransparency.a, 0.0, 1.0);
-      baseColorAndTransparency.a = softAlpha;
-    #else
-      baseColorAndTransparency.a = clamp(color.a, 0.0, 1.0);
-    #endif
-  }
-
-  #define CC_SURFACES_FRAGMENT_ALPHA_CLIP_ONLY
-  void SurfacesFragmentAlphaClipOnly()
-  {
-    #if USE_ALPHA_TEST
-      float alpha = clamp(baseColor.ALPHA_TEST_CHANNEL, 0.0, 1.0);
-      #if USE_BASE_COLOR_MAP
-        alpha *= texture(baseColorMap, FSInput_texcoord).ALPHA_TEST_CHANNEL;
+      #if CC_DIR_LIGHT_SHADOW_TYPE == CC_DIR_LIGHT_SHADOW_UNIFORM
+        shadow = CCShadowFactorBase(CC_SHADOW_POSITION, N, v_shadowBias);
       #endif
-
-      #if USE_ALPHA_FEATHER
-        float feather = clamp(miscParams.y, 1e-6, 1.0);
-        float threshold = clamp(colorScaleAndCutoff.w, 0.0, 1.0);
-        float softAlpha = smoothstep(threshold - feather, threshold + feather, alpha);
-        if (softAlpha <= 0.0) discard;
-      #else
-        if (alpha < colorScaleAndCutoff.w) discard;
-      #endif
-    #endif
-  }
-
-  #define CC_SURFACES_FRAGMENT_MODIFY_WORLD_NORMAL
-  vec3 SurfacesFragmentModifyWorldNormal()
-  {
-    vec3 normal = FSInput_worldNormal;
-    #if USE_NORMAL_MAP
-      vec3 nmmp = texture(normalMap, FSInput_texcoord).xyz - vec3(0.5);
-      normal = CalculateNormalFromTangentSpace(nmmp, emissiveScaleAndStrenth.w, normalize(normal.xyz), normalize(FSInput_worldTangent), FSInput_mirrorNormal);
+    }
     #endif
 
-    return normalize(normal);
-  }
+    vec3 mergeShadow = o.rgb * shadow;
+    vec3 lightColor = cc_mainLitColor.rgb * cc_mainLitColor.w * 0.8;
+    vec3 finalColor = lightColor * mergeShadow;
 
-  #define CC_SURFACES_FRAGMENT_MODIFY_EMISSIVE
-  vec3 SurfacesFragmentModifyEmissive()
-  {
-    vec3 emissive = emissive.rgb * emissiveScaleAndStrenth.xyz;
-    #if USE_EMISSIVE_MAP
-      emissive *= SRGBToLinear(texture(emissiveMap, FSInput_texcoord).rgb);
-    #endif
-    return emissive;
-  }
+    float alpha = o.a;
+    o = vec4(finalColor, alpha);
 
-  #define CC_SURFACES_FRAGMENT_MODIFY_TOON_STEP_AND_FEATHER
-  vec4 SurfacesFragmentModifyToonStepAndFeather()
-  {
-    return shadeParams;
-  }
-
-  #define CC_SURFACES_FRAGMENT_MODIFY_TOON_SHADOW_COVER
-  float SurfacesFragmentModifyToonShadowCover()
-  {
-      return miscParams.x;
-  }
-  
-  #define CC_SURFACES_FRAGMENT_MODIFY_TOON_SPECULAR
-  vec4 SurfacesFragmentModifyToonSpecular()
-  {
-    vec4 specularParam = specular;
-    #if USE_SPECULAR_MAP
-      specularParam.rgb *= SRGBToLinear(texture(specularMap, FSInput_texcoord).rgb);
-    #endif
-    return specularParam;
+    CC_APPLY_FOG(o);
+    return CCFragOutput(o);
   }
 }%
 
-CCProgram toon-vs %{
-  precision highp float;
 
-  // 1. surface internal macros, for technique usage or remapping some user (material) macros to surface internal macros
-  #include <macro-remapping>
-  #include <surfaces/effect-macros/common-macros>
-
-  // 2. common include with corresponding shader stage
-  #include <surfaces/includes/common-vs>
-
-  // 3. user surface functions that can use user (effect) parameters (ubo Constants)
-  //    see surfaces/default-functions/xxx.chunk
-  #include <shared-ubos>
-  #include <surface-vertex>
-
-  // 4. surface include with corresponding shader stage and shading-model (optional)
-  #include <surfaces/includes/toon-vs>
-
-  // 5. shader entry with corresponding shader stage and technique usage/type
-  #include <shading-entries/main-functions/render-to-scene/vs>
-}%
-
-
-CCProgram shadow-caster-vs %{
-  precision highp float;
-  #include <surfaces/effect-macros/render-to-shadowmap>
-  #include <surfaces/includes/common-vs>
-  #include <shared-ubos>
-  #include <surface-vertex>
-  #include <shading-entries/main-functions/render-to-shadowmap/vs>
-}%
-
-CCProgram toon-fs %{
-  // shading-model : toon
-  // lighting-model : toon
-  // shader stage : fs
-  // technique usage/type : render-to-scene
-
-  precision highp float;
-  // 1. surface internal macros, for technique usage or remapping some user (material) macros to surface internal macros
-  #include <macro-remapping>
-  #include <surfaces/effect-macros/common-macros>
-
-  // 2. common include with corresponding shader stage
-  #include <surfaces/includes/common-fs>
-
-  // 3. user surface functions that can use user (effect) parameters (ubo Constants)
-  //    see surfaces/default-functions/xxx.chunk
-  #include <shared-ubos>
-  #include <surface-fragment>
-
-  // 4. lighting-model (optional)
-  #include <lighting-models/includes/toon>
-
-  // 5. surface include with corresponding shader stage and shading-model (optional)
-  #include <surfaces/includes/toon-fs>
-
-  // 6. shader entry with corresponding shader stage and technique usage/type
-  #include <shading-entries/main-functions/render-to-scene/fs>
-}%
-
-CCProgram shadow-caster-fs %{
-  precision highp float;
-  #include <surfaces/effect-macros/render-to-shadowmap>
-  #include <surfaces/includes/common-fs>
-  #include <shared-ubos>
-  #include <surface-fragment>
-  #include <shading-entries/main-functions/render-to-shadowmap/fs>
-}%
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-////////////////////////////////////////////////silhouette-edge sample
-// how to write a simple surface material
-// change technique outline-vs/fs:vert/frag to silhouette-edge-vs/fs
 CCProgram surface-vertex-silhouette-edge %{
   uniform OutlineVert {
   vec4 outlineParams; // x: line width, y: depth hack
@@ -474,4 +407,93 @@ CCProgram silhouette-edge-fs %{
   #include <surfaces/includes/common-fs>
   #include <surface-fragment-silhouette-edge>
   #include <shading-entries/main-functions/misc/silhouette-edge-fs>
+}%
+
+CCProgram shared-ubos %{
+  uniform Constants {
+    vec4 tilingOffset;
+    vec4 baseColor;
+    vec4 colorScaleAndCutoff;
+    vec4 shadeColor1;
+    vec4 shadeColor2;
+    vec4 specular; // xyz: specular color, w: power
+    vec4 shadeParams;
+    vec4 miscParams;
+    vec4 emissive;
+    vec4 emissiveScaleAndStrenth;
+  };
+}%
+
+CCProgram shadow-caster-vs %{
+  precision highp float;
+  #include <legacy/input-standard>
+  #include <legacy/decode-base>
+  #include <legacy/local-batch>
+  #include <shared-ubos>
+  #include <builtin/uniforms/cc-shadow>
+
+  out vec2 v_uv;
+  out vec4 v_worldPos;
+  out highp vec2 v_clip_depth;
+
+  vec4 vert () {
+    StandardVertInput In;
+    CCVertInput(In);
+
+    mat4 matWorld, matWorldIT;
+    CCGetWorldMatrixFull(matWorld, matWorldIT);
+
+    v_worldPos = matWorld * In.position;
+    vec4 clipPos = cc_matLightViewProj * v_worldPos;
+    v_clip_depth = clipPos.zw;
+
+    v_uv = a_texCoord * tilingOffset.xy + tilingOffset.zw;
+
+    return clipPos;
+  }
+}%
+
+CCProgram shadow-caster-fs %{
+  precision highp float;
+  #include <shared-ubos>
+  #include <common/data/packing>
+  #include <legacy/shadow-map-base>
+
+  in vec2 v_uv;
+  in vec4 v_worldPos;
+  in highp vec2 v_clip_depth;
+
+  #if USE_BASE_COLOR_MAP
+    uniform sampler2D baseColorMap;
+  #endif
+
+  #if USE_ALPHA_TEST
+    #pragma define-meta ALPHA_TEST_CHANNEL options([a, r, g, b])
+  #endif
+
+  vec4 frag () {
+    vec4 baseColor = baseColor;
+
+    #if USE_ALPHA_TEST
+      #if USE_BASE_COLOR_MAP
+        baseColor *= texture(baseColorMap, v_uv);
+      #endif
+      if (baseColor.ALPHA_TEST_CHANNEL < colorScaleAndCutoff.w) discard;
+    #endif
+
+    highp float clipDepth = v_clip_depth.x / v_clip_depth.y * 0.5 + 0.5;
+    // spot use linear
+    if(cc_shadowLPNNInfo.x > 0.000001 && cc_shadowLPNNInfo.x < 1.999999) {
+      // enabled linear depth
+      #if CC_SHADOWMAP_USE_LINEAR_DEPTH
+        clipDepth = CCGetLinearDepth(v_worldPos.xyz);
+      #endif
+    }
+
+    #if CC_SHADOWMAP_FORMAT == SHADOWMAP_FORMAT_RGBA8
+      return packDepthToRGBA(clipDepth);
+    #else
+      return vec4(clipDepth, 1.0, 1.0, 1.0);
+    #endif
+  }
 }%
