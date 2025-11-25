@@ -234,11 +234,11 @@ CCProgram surface-fragment %{
     baseColorAndTransparency.rgb *= colorScaleAndCutoff.xyz;
 
     #if USE_ALPHA_TEST
-      float alphaSignal = baseColorAndTransparency.ALPHA_TEST_CHANNEL;
+      float alphaSignal = clamp(baseColorAndTransparency.ALPHA_TEST_CHANNEL, 0.0, 1.0);
       #if USE_ALPHA_FEATHER
         // alphaFeatherWidth drives miscParams.y to soften the cutoff
-        float feather = max(miscParams.y, 1e-6);
-        float threshold = colorScaleAndCutoff.w;
+        float feather = clamp(miscParams.y, 1e-6, 1.0);
+        float threshold = clamp(colorScaleAndCutoff.w, 0.0, 1.0);
         float softAlpha = smoothstep(threshold - feather, threshold + feather, alphaSignal);
         baseColorAndTransparency.a *= softAlpha;
         if (softAlpha <= 0.0) discard;
@@ -258,14 +258,14 @@ CCProgram surface-fragment %{
   void SurfacesFragmentAlphaClipOnly()
   {
     #if USE_ALPHA_TEST
-      float alpha = baseColor.ALPHA_TEST_CHANNEL;
+      float alpha = clamp(baseColor.ALPHA_TEST_CHANNEL, 0.0, 1.0);
       #if USE_BASE_COLOR_MAP
         alpha *= texture(baseColorMap, FSInput_texcoord).ALPHA_TEST_CHANNEL;
       #endif
 
       #if USE_ALPHA_FEATHER
-        float feather = max(miscParams.y, 1e-6);
-        float threshold = colorScaleAndCutoff.w;
+        float feather = clamp(miscParams.y, 1e-6, 1.0);
+        float threshold = clamp(colorScaleAndCutoff.w, 0.0, 1.0);
         float softAlpha = smoothstep(threshold - feather, threshold + feather, alpha);
         if (softAlpha <= 0.0) discard;
       #else
