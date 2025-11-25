@@ -187,23 +187,25 @@ CCProgram unlit-vs %{
       v_color = a_color;
     #endif
 
+    vec4 worldPos = matWorld * position;
+    vec3 worldNormal = normalize((matWorldIT * vec4(a_normal, 0.0)).xyz);
+
     #if USE_RIM_LIGHT
-    v_position = (matWorld * position).xyz;
-    v_normal   = normalize((matWorldIT * vec4(a_normal, 0.0)).xyz);
+      v_position = worldPos.xyz;
+      v_normal = worldNormal;
     #endif
 
-    v_position_all = (matWorld * position).xyz;
-    v_normal_all   = normalize((matWorldIT * vec4(a_normal, 0.0)).xyz);
+    v_position_all = worldPos.xyz;
+    v_normal_all = worldNormal;
 
     #if CC_RECEIVE_SHADOW
       v_shadowBias = CCGetShadowBias();
     #endif
 
-    vec4 pos = matWorld * position;
-    CC_TRANSFER_SHADOW(pos);
+    CC_TRANSFER_SHADOW(worldPos);
 
-    CC_TRANSFER_FOG(matWorld * position);
-    return cc_matProj * (cc_matView * matWorld) * position;
+    CC_TRANSFER_FOG(worldPos);
+    return cc_matProj * (cc_matView * worldPos);
   }
 }%
 
@@ -258,14 +260,6 @@ CCProgram unlit-fs %{
     return mix(vec3(gray), color, sat);
   }
 
-  vec3 adjustLightness(vec3 color, float l) {
-    return color + vec3(l); // cộng offset sáng
-  }
-
-  vec3 adjustEmissive(vec3 color, float e) {
-    return color * vec3(e);
-  }
-
   vec4 frag () {
     float saturation = adjustParams.x;
     float lightness = adjustParams.y;
@@ -287,10 +281,10 @@ CCProgram unlit-fs %{
     #endif
 
     o.rgb = adjustSaturation(o.rgb, saturation);
-    o.rgb = adjustLightness(o.rgb, lightness);
-    o.rgb = adjustEmissive(o.rgb, emissiveStrength);
+    o.rgb += vec3(lightness);
+    o.rgb *= emissiveStrength;
 
-     #if USE_TEXTURE_EMISSIVE
+    #if USE_TEXTURE && USE_TEXTURE_EMISSIVE
       o.rgb *= texColor.rgb;
     #endif
 
@@ -298,32 +292,33 @@ CCProgram unlit-fs %{
       if (o.ALPHA_TEST_CHANNEL < colorScaleAndCutoff.w) discard;
     #endif
 
+    vec3 worldPos = v_position_all;
+    vec3 viewDir = normalize(cc_cameraPos.xyz - worldPos);
+    vec3 N = normalize(v_normal_all);
+
     #if USE_RIM_LIGHT
-    // Rim light calculation
-    float rimIntensity = rimParams.x;
-    float rimSpread = rimParams.y;
-    vec3 viewDir = normalize(cc_cameraPos.xyz - v_position);
-    float NdotV = 1.0 - max(0.0, dot(normalize(v_normal), viewDir));
-    float rim = smoothstep(1.0 - rimSpread, 1.0, NdotV);
-    o.rgb += rimColor.rgb * rim * rimIntensity;
+      // Rim light calculation
+      float rimIntensity = rimParams.x;
+      float rimSpread = rimParams.y;
+      float NdotV = 1.0 - max(0.0, dot(N, viewDir));
+      float rim = smoothstep(1.0 - rimSpread, 1.0, NdotV);
+      o.rgb += rimColor.rgb * rim * rimIntensity;
     #endif
 
-    vec3 position = v_position_all;
-    vec3 V = normalize(cc_cameraPos.xyz - v_position_all);
-    vec3 N = normalize(v_normal_all);
     vec3 L = normalize(-cc_mainLitDir.xyz);
     float NL = 0.5 * dot(N, L) + 0.5;
-    float NH = 0.5 * dot(normalize(V + L), N) + 0.5;
+    vec3 halfVec = normalize(viewDir + L);
+    float NH = 0.5 * dot(halfVec, N) + 0.5;
     float shadow = 1.0;
     #if CC_RECEIVE_SHADOW && CC_SHADOW_TYPE == CC_SHADOW_MAP
-    if(shadowCover < NL && cc_mainLitDir.w > 0.0) {
-      #if CC_DIR_LIGHT_SHADOW_TYPE == CC_DIR_LIGHT_SHADOW_CASCADED
-        shadow = CCCSMFactorBase(position, N, v_shadowBias);
-      #endif
-      #if CC_DIR_LIGHT_SHADOW_TYPE == CC_DIR_LIGHT_SHADOW_UNIFORM
-        shadow = CCShadowFactorBase(CC_SHADOW_POSITION, N, v_shadowBias);
-      #endif
-    }
+      if(shadowCover < NL && cc_mainLitDir.w > 0.0) {
+        #if CC_DIR_LIGHT_SHADOW_TYPE == CC_DIR_LIGHT_SHADOW_CASCADED
+          shadow = CCCSMFactorBase(worldPos, N, v_shadowBias);
+        #endif
+        #if CC_DIR_LIGHT_SHADOW_TYPE == CC_DIR_LIGHT_SHADOW_UNIFORM
+          shadow = CCShadowFactorBase(CC_SHADOW_POSITION, N, v_shadowBias);
+        #endif
+      }
     #endif
 
     vec3 mergeShadow = o.rgb * shadow;
