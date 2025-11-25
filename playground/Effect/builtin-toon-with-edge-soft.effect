@@ -177,6 +177,7 @@ CCProgram surface-fragment %{
       vec4 texColor = texture(baseColorMap, texCoord);
       texColor.rgb = SRGBToLinear(texColor.rgb);
       #if USE_WEBGL1_SIMPLE_FXAA
+        // webgl1FxaaLumaThreshold(fxaaParams.x) & webgl1FxaaBlendStrength(fxaaParams.y)
         const vec3 lumaCoeff = vec3(0.299, 0.587, 0.114);
         vec2 fxaaTexel = max(fwidth(texCoord), vec2(1e-5));
         vec2 fxaaDir = fxaaTexel * vec2(1.0, -1.0);
@@ -235,6 +236,7 @@ CCProgram surface-fragment %{
     #if USE_ALPHA_TEST
       float alphaSignal = baseColorAndTransparency.ALPHA_TEST_CHANNEL;
       #if USE_ALPHA_FEATHER
+        // alphaFeatherWidth drives miscParams.y to soften the cutoff
         float feather = max(miscParams.y, 1e-6);
         float threshold = colorScaleAndCutoff.w;
         float softAlpha = smoothstep(threshold - feather, threshold + feather, alphaSignal);
