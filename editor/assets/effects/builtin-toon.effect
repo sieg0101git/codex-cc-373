@@ -91,7 +91,7 @@ CCProgram shared-ubos %{
     vec4 shadeColor2;
     vec4 specular; // xyz: specular color, w: power
     vec4 shadeParams;
-    vec4 miscParams;
+    vec4 miscParams; // x: shadow cover, y: alpha feather half-width
     vec4 emissive;
     vec4 emissiveScaleAndStrenth;
   };}%
@@ -173,7 +173,21 @@ CCProgram surface-fragment %{
     baseColorAndTransparency.rgb *= colorScale;
 
     #if USE_ALPHA_TEST
-      if (baseColorAndTransparency.ALPHA_TEST_CHANNEL < colorScaleAndCutoff.w) discard;
+      float alphaSignal = baseColorAndTransparency.ALPHA_TEST_CHANNEL;
+      #if USE_ALPHA_FEATHER
+        float feather = max(miscParams.y, 1e-6);
+        float threshold = colorScaleAndCutoff.w;
+        float softAlpha = smoothstep(threshold - feather, threshold + feather, alphaSignal);
+        baseColorAndTransparency.a *= softAlpha;
+        if (softAlpha <= 0.0) discard;
+      #else
+        if (alphaSignal < colorScaleAndCutoff.w) discard;
+      #endif
+    #elif USE_ALPHA_FEATHER
+      float softAlpha = clamp(baseColorAndTransparency.a, 0.0, 1.0);
+      baseColorAndTransparency.a = softAlpha;
+    #else
+      baseColorAndTransparency.a = clamp(color.a, 0.0, 1.0);
     #endif
   }
 
@@ -183,10 +197,17 @@ CCProgram surface-fragment %{
     #if USE_ALPHA_TEST
       float alpha = baseColor.ALPHA_TEST_CHANNEL;
       #if USE_BASE_COLOR_MAP
-        alpha = texture(baseColorMap, FSInput_texcoord).ALPHA_TEST_CHANNEL;
+        alpha *= texture(baseColorMap, FSInput_texcoord).ALPHA_TEST_CHANNEL;
       #endif
-  
-      if (alpha < colorScaleAndCutoff.w) discard;
+
+      #if USE_ALPHA_FEATHER
+        float feather = max(miscParams.y, 1e-6);
+        float threshold = colorScaleAndCutoff.w;
+        float softAlpha = smoothstep(threshold - feather, threshold + feather, alpha);
+        if (softAlpha <= 0.0) discard;
+      #else
+        if (alpha < colorScaleAndCutoff.w) discard;
+      #endif
     #endif
   }
 
