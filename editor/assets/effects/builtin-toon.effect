@@ -252,7 +252,7 @@ CCProgram surface-vertex %{
       #if USE_ALPHA_TEST
         float alpha = baseColor.ALPHA_TEST_CHANNEL;
         #if USE_BASE_COLOR_MAP
-          alpha *= texture(baseColorMap, FSInput_texcoord).ALPHA_TEST_CHANNEL;
+        alpha = texture(baseColorMap, FSInput_texcoord).ALPHA_TEST_CHANNEL;
         #endif
 
         #if USE_ALPHA_FEATHER
