@@ -224,8 +224,8 @@ CCProgram surface-vertex %{
           shade2 *= texColor.rgb;
         #endif
       #endif
-      baseColorAndTransparency = color;
-      baseColorAndTransparency.rgb *= colorScaleAndCutoff.xyz;
+    baseColorAndTransparency = color;
+    baseColorAndTransparency.rgb *= colorScaleAndCutoff.xyz;
 
       #if USE_ALPHA_TEST
         float alphaSignal = baseColorAndTransparency.ALPHA_TEST_CHANNEL;
@@ -243,6 +243,10 @@ CCProgram surface-vertex %{
         baseColorAndTransparency.a = softAlpha;
       #else
         baseColorAndTransparency.a = clamp(color.a, 0.0, 1.0);
+      #endif
+
+      #if USE_ALPHA_FEATHER
+        baseColorAndTransparency.rgb *= baseColorAndTransparency.a;
       #endif
     }
 
