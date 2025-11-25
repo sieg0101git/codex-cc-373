@@ -143,11 +143,13 @@ CCProgram surface-fragment %{
   #define CC_SURFACES_FRAGMENT_MODIFY_BASECOLOR_AND_TOONSHADE
   void SurfacesFragmentModifyBaseColorAndToonShade(out vec4 baseColorAndTransparency, out vec3 shade1, out vec3 shade2)
   {
-    shade2 = shadeColor2.rgb * colorScaleAndCutoff.rgb;
+    vec3 colorScale = colorScaleAndCutoff.xyz;
+
+    shade2 = shadeColor2.rgb * colorScale;
     #if USE_2ND_SHADE_MAP
       shade2 *= SRGBToLinear(texture(shadeMap2, FSInput_texcoord).rgb);
     #endif
-    shade1 = shadeColor1.rgb * colorScaleAndCutoff.rgb;
+    shade1 = shadeColor1.rgb * colorScale;
     #if USE_1ST_SHADE_MAP
       shade1 *= SRGBToLinear(texture(shadeMap1, FSInput_texcoord).rgb);
       #if SHADE_MAP_1_AS_SHADE_MAP_2
@@ -168,10 +170,24 @@ CCProgram surface-fragment %{
       #endif
     #endif
     baseColorAndTransparency = color;
-    baseColorAndTransparency.rgb *= colorScaleAndCutoff.xyz;
+    baseColorAndTransparency.rgb *= colorScale;
+    baseColorAndTransparency.a = clamp(baseColorAndTransparency.a, 0.0, 1.0);
 
     #if USE_ALPHA_TEST
-      if (baseColorAndTransparency.ALPHA_TEST_CHANNEL < colorScaleAndCutoff.w) discard;
+      float alphaSignal = clamp(baseColorAndTransparency.ALPHA_TEST_CHANNEL, 0.0, 1.0);
+      #if USE_ALPHA_FEATHER
+        float feather = max(miscParams.y, 1e-6);
+        float threshold = colorScaleAndCutoff.w;
+        float softAlpha = smoothstep(threshold - feather, threshold + feather, alphaSignal);
+        baseColorAndTransparency.a *= softAlpha;
+        if (softAlpha <= 0.0) discard;
+      #else
+        if (alphaSignal < colorScaleAndCutoff.w) discard;
+      #endif
+    #elif USE_ALPHA_FEATHER
+      baseColorAndTransparency.a = clamp(baseColorAndTransparency.a, 0.0, 1.0);
+    #else
+      baseColorAndTransparency.a = clamp(baseColorAndTransparency.a, 0.0, 1.0);
     #endif
   }
 
@@ -179,22 +195,30 @@ CCProgram surface-fragment %{
   void SurfacesFragmentAlphaClipOnly()
   {
     #if USE_ALPHA_TEST
-      float alpha = baseColor.ALPHA_TEST_CHANNEL;
+      float alpha = clamp(baseColor.ALPHA_TEST_CHANNEL, 0.0, 1.0);
       #if USE_BASE_COLOR_MAP
-        alpha = texture(baseColorMap, FSInput_texcoord).ALPHA_TEST_CHANNEL;
+        alpha *= clamp(texture(baseColorMap, FSInput_texcoord).ALPHA_TEST_CHANNEL, 0.0, 1.0);
       #endif
-  
-      if (alpha < colorScaleAndCutoff.w) discard;
+
+      #if USE_ALPHA_FEATHER
+        float feather = max(miscParams.y, 1e-6);
+        float threshold = colorScaleAndCutoff.w;
+        float softAlpha = smoothstep(threshold - feather, threshold + feather, alpha);
+        if (softAlpha <= 0.0) discard;
+      #else
+        if (alpha < colorScaleAndCutoff.w) discard;
+      #endif
     #endif
   }
 
   #define CC_SURFACES_FRAGMENT_MODIFY_WORLD_NORMAL
   vec3 SurfacesFragmentModifyWorldNormal()
   {
-    vec3 normal = FSInput_worldNormal;
+    vec3 normal = normalize(FSInput_worldNormal);
     #if USE_NORMAL_MAP
       vec3 nmmp = texture(normalMap, FSInput_texcoord).xyz - vec3(0.5);
-      normal = CalculateNormalFromTangentSpace(nmmp, emissiveScaleAndStrenth.w, normalize(normal.xyz), normalize(FSInput_worldTangent), FSInput_mirrorNormal);
+      vec3 tangent = normalize(FSInput_worldTangent);
+      normal = CalculateNormalFromTangentSpace(nmmp, emissiveScaleAndStrenth.w, normal, tangent, FSInput_mirrorNormal);
     #endif
 
     return normalize(normal);
