@@ -8,68 +8,38 @@ export default class DecodeUuid {
             return '';
         }
 
-        var base64 = compressed;
-        var remainder = base64.length % 4;
-        if (remainder === 2) {
-            base64 += '==';
-        } else if (remainder === 3) {
-            base64 += '=';
-        } else if (remainder === 1) {
-            base64 += '===';
-        }
+        var separator = '@';
+        var base64Keys = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+        var hexChars = '0123456789abcdef';
 
-        var raw = '';
-        if (typeof atob === 'function') {
-            try {
-                raw = atob(base64);
-            } catch (error) {
-                raw = '';
+        var t = ['', '', '', ''];
+        var uuidTemplate = t.concat(t, '-', t, '-', t, '-', t, '-', t, t, t);
+        var indices = [] as number[];
+        for (var idx = 0; idx < uuidTemplate.length; idx++) {
+            if (uuidTemplate[idx] !== '-') {
+                indices.push(idx);
             }
         }
 
-        if (!raw) {
-            var decodeMap = {} as { [key: string]: number };
-            var chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
-            for (var i = 0; i < chars.length; i++) {
-                decodeMap[chars.charAt(i)] = i;
-            }
-
-            var buffer = 0;
-            var bits = 0;
-            for (var index = 0; index < base64.length; index++) {
-                var value = decodeMap[base64.charAt(index)];
-                if (value === undefined) {
-                    continue;
-                }
-                buffer = (buffer << 6) | value;
-                bits += 6;
-                if (bits >= 8) {
-                    bits -= 8;
-                    raw += String.fromCharCode((buffer >> bits) & 0xff);
-                }
-            }
+        var sections = compressed.split(separator);
+        var uuidSection = sections[0];
+        if (uuidSection.length !== 22) {
+            return compressed;
         }
 
-        var hex = '';
-        for (var j = 0; j < raw.length; j++) {
-            var code = raw.charCodeAt(j).toString(16);
-            if (code.length < 2) {
-                code = '0' + code;
-            }
-            hex += code;
+        uuidTemplate[0] = uuidSection.charAt(0);
+        uuidTemplate[1] = uuidSection.charAt(1);
+
+        for (var i = 2, j = 2; i < 22; i += 2) {
+            var lhs = base64Keys.indexOf(uuidSection.charAt(i));
+            var rhs = base64Keys.indexOf(uuidSection.charAt(i + 1));
+
+            uuidTemplate[indices[j++]] = hexChars.charAt(lhs >> 2);
+            uuidTemplate[indices[j++]] = hexChars.charAt(((lhs & 3) << 2) | (rhs >> 4));
+            uuidTemplate[indices[j++]] = hexChars.charAt(rhs & 0xf);
         }
 
-        if (hex.length !== 32) {
-            return hex;
-        }
-
-        var parts = [
-            hex.substring(0, 8),
-            hex.substring(8, 12),
-            hex.substring(12, 16),
-            hex.substring(16, 20),
-            hex.substring(20)
-        ];
-        return parts.join('-');
+        var decoded = uuidTemplate.join('');
+        return compressed.replace(uuidSection, decoded);
     }
 }
