@@ -54,19 +54,52 @@ const Indices = UuidTemplate.map((x, i) => (x === '-' ? NaN : i)).filter(Number.
 export default function decodeUuid (base64: string) {
     const strs = base64.split(separator);
     const uuid = strs[0];
-    if (uuid.length !== 22) {
+    if (uuid.length !== 22 && uuid.length !== 23) {
         return base64;
     }
     UuidTemplate[0] = base64[0];
     UuidTemplate[1] = base64[1];
-    for (let i = 2, j = 2; i < 22; i += 2) {
-        const lhs = BASE64_VALUES[base64.charCodeAt(i)];
-        const rhs = BASE64_VALUES[base64.charCodeAt(i + 1)];
-        UuidTemplate[Indices[j++]] = HexChars[lhs >> 2];
-        UuidTemplate[Indices[j++]] = HexChars[((lhs & 3) << 2) | rhs >> 4];
-        UuidTemplate[Indices[j++]] = HexChars[rhs & 0xF];
+    if (uuid.length === 22) {
+        for (let i = 2, j = 2; i < 22; i += 2) {
+            const lhs = BASE64_VALUES[base64.charCodeAt(i)];
+            const rhs = BASE64_VALUES[base64.charCodeAt(i + 1)];
+            UuidTemplate[Indices[j++]] = HexChars[lhs >> 2];
+            UuidTemplate[Indices[j++]] = HexChars[((lhs & 3) << 2) | rhs >> 4];
+            UuidTemplate[Indices[j++]] = HexChars[rhs & 0xF];
+        }
+        return base64.replace(uuid, UuidTemplate.join(''));
     }
-    return base64.replace(uuid, UuidTemplate.join(''));
+
+    let encoded = uuid.slice(2);
+    const mod = encoded.length % 4;
+    if (mod === 1) {
+        return base64;
+    }
+    if (mod > 0) {
+        encoded += '===='.slice(mod);
+    }
+    const bytes: number[] = [];
+    for (let i = 0; i < encoded.length; i += 4) {
+        const lhs = BASE64_VALUES[encoded.charCodeAt(i)];
+        const mid = BASE64_VALUES[encoded.charCodeAt(i + 1)];
+        const rhs = BASE64_VALUES[encoded.charCodeAt(i + 2)];
+        const end = BASE64_VALUES[encoded.charCodeAt(i + 3)];
+        bytes.push((lhs << 2) | (mid >> 4));
+        if (rhs !== 64) {
+            bytes.push(((mid & 0x0F) << 4) | (rhs >> 2));
+        }
+        if (end !== 64) {
+            bytes.push(((rhs & 0x03) << 6) | end);
+        }
+    }
+
+    for (let i = 0, j = 2; i < bytes.length && j < Indices.length; i++) {
+        const byte = bytes[i];
+        UuidTemplate[Indices[j++]] = HexChars[byte >> 4];
+        UuidTemplate[Indices[j++]] = HexChars[byte & 0x0F];
+    }
+
+    return UuidTemplate.join('');
 }
 
 if (TEST) {
