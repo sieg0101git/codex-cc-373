@@ -23,14 +23,17 @@ export default class DecodeUuid {
 
         var sections = compressed.split(separator);
         var uuidSection = sections[0];
-        if (uuidSection.length !== 22) {
+        var uuidLength = uuidSection.length;
+        if (uuidLength !== 22 && uuidLength !== 23) {
             return compressed;
         }
 
-        uuidTemplate[0] = uuidSection.charAt(0);
-        uuidTemplate[1] = uuidSection.charAt(1);
+        var startIndex = uuidLength === 23 ? 5 : 2;
+        for (var n = 0; n < startIndex; n++) {
+            uuidTemplate[indices[n]] = uuidSection.charAt(n);
+        }
 
-        for (var i = 2, j = 2; i < 22; i += 2) {
+        for (var i = startIndex, j = startIndex; i + 1 < uuidLength; i += 2) {
             var lhs = base64Keys.indexOf(uuidSection.charAt(i));
             var rhs = base64Keys.indexOf(uuidSection.charAt(i + 1));
 
